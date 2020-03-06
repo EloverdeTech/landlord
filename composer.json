@@ -1,45 +1,47 @@
 {
-    "name": "eloverde-sistemas/landlord",
-    "description": "A simple, single database multi-tenancy solution for Laravel 5.2+",
-    "license": "MIT",
-    "keywords": [
-        "tenant",
-        "tenancy",
-        "multitenant",
-        "multitenancy"
-    ],
-    "authors": [
-        {
-            "name": "Caleb Fidecaro",
-            "email": "calebfidecaro@gmail.com"
-        },
-        {
-            "name": "Eloverde Sistemas",
-            "email": "contato@eloverde.com.br"
-        }
-    ],
-    "require": {
-        "php": ">=5.6.0",
-        "illuminate/support": "5.2.*|5.3.*|5.4.*|5.5.*|5.6.*"
+  "name": "eloverde-sistemas/landlord",
+  "description": "A simple, single database multi-tenancy solution for Laravel 5.2+",
+  "license": "MIT",
+  "keywords": [
+    "tenant",
+    "tenancy",
+    "multitenant",
+    "multitenancy"
+  ],
+  "authors": [
+    {
+      "name": "Caleb Fidecaro",
+      "email": "calebfidecaro@gmail.com"
     },
-    "require-dev": {
-        "mockery/mockery": "~0.9|~1.0",
-        "phpunit/phpunit": "5.5.*|6.0.*|7.0.*",
-        "laravel/framework": "5.2.*|5.3.*|5.4.*|5.5.*|5.6.*"
-    },
-    "autoload": {
-        "psr-4": {
-            "Eloverde\\Landlord\\": "src/"
-        }
-    },
-    "extra": {
-        "laravel": {
-            "providers": [
-                "Eloverde\\Landlord\\LandlordServiceProvider"
-            ],
-            "aliases": {
-                "Landlord": "Eloverde\\Landlord\\Facades\\Landlord"
-            }
-        }
+    {
+      "name": "Eloverde Sistemas",
+      "email": "contato@eloverde.com.br"
     }
+  ],
+  "require": {
+    "php": ">=7.4",
+    "illuminate/support": "5.4.*|5.5.*|5.6.*|6.*.*|7.*.*",
+    "illuminate/database": "~5.6.34|~5.7.0|~5.8.0|^6.0"
+  },
+  "require-dev": {
+    "mockery/mockery": "~0.9|~1.0",
+    "phpunit/phpunit": "5.5.*|6.0.*|7.0.*",
+    "laravel/framework": "5.4.*|5.5.*|5.6.*|6.*.*|7.*.*",
+    "orchestra/testbench": "~3.6.0|~3.7.0|~3.8.0|^4.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Eloverde\\Landlord\\": "src/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Eloverde\\Landlord\\LandlordServiceProvider"
+      ],
+      "aliases": {
+        "Landlord": "Eloverde\\Landlord\\Facades\\Landlord"
+      }
+    }
+  }
 }
