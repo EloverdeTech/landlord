@@ -1,127 +1,143 @@
 <?php
 
+
 use Eloverde\Landlord\BelongsToTenants;
 use Eloverde\Landlord\Facades\Landlord;
-use Eloverde\Landlord\TenantManager;
+use Eloverde\Landlord\LandlordServiceProvider;
+use Eloverde\Landlord\TenantScope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use PHPUnit\Framework\TestCase;
+use Illuminate\Database\Schema\Blueprint;
+use Orchestra\Testbench\TestCase;
 
 class LandlordTest extends TestCase
 {
+    protected function setUp()
+    {
+        parent::setUp();
+
+        $schemaBuilder = $this->app['db']->connection()->getSchemaBuilder();
+
+        $schemaBuilder->create('model_stubs', function (Blueprint $table) {
+            $table->increments('id');
+            $table->timestamps();
+            $table->string('name');
+            $table->integer('tenant_a_id');
+            $table->integer('tenant_b_id');
+        });
+    }
+
+    protected function getPackageProviders($app)
+    {
+        return [
+            LandlordServiceProvider::class
+        ];
+    }
+
     public function testTenantsWithStrings()
     {
-        $landlord = new TenantManager();
+        Landlord::addTenant('tenant_a_id', 1);
+        Landlord::addTenant('tenant_b_id', 2);
 
-        $landlord->addTenant('tenant_a_id', 1);
+        $model = new ModelStub();
+        $sql = $this->getSqlFromBuilder($model->query());
 
-        $this->assertEquals(['tenant_a_id' => 1], $landlord->getTenants()->toArray());
-
-        $landlord->addTenant('tenant_b_id', 2);
-
-        $this->assertEquals(['tenant_a_id' => 1, 'tenant_b_id' => 2], $landlord->getTenants()->toArray());
-
-        $landlord->removeTenant('tenant_a_id');
-
-        $this->assertEquals(['tenant_b_id' => 2], $landlord->getTenants()->toArray());
-
-        $this->assertTrue($landlord->hasTenant('tenant_b_id'));
-
-        $this->assertFalse($landlord->hasTenant('tenant_a_id'));
+        $this->assertContains("\"model_stubs\".\"tenant_a_id\" = '1'", $sql);
+        $this->assertContains("\"model_stubs\".\"tenant_b_id\" = '2'", $sql);
     }
 
     public function testTenantsWithModels()
     {
-        Landlord::shouldReceive('applyTenantScopes');
-
         $tenantA = new TenantA();
-
-        $tenantA->id = 1;
-
         $tenantB = new TenantB();
 
+        $tenantA->id = 1;
         $tenantB->id = 2;
 
-        $landlord = new TenantManager();
+        Landlord::addTenant($tenantA);
+        Landlord::addTenant($tenantB);
 
-        $landlord->addTenant($tenantA);
+        $model = new ModelStub();
+        $sql = $this->getSqlFromBuilder($model->query());
 
-        $this->assertEquals(['tenant_a_id' => 1], $landlord->getTenants()->toArray());
+        $this->assertContains("\"model_stubs\".\"tenant_a_id\" = '1'", $sql);
+        $this->assertContains("\"model_stubs\".\"tenant_b_id\" = '2'", $sql);
+    }
 
-        $landlord->addTenant($tenantB);
+    public function testTenantsWithTenantScope()
+    {
+        $tenantA = (new TenantScope())
+            ->onQuery(function (Builder $builder, Model $model) {
+                $builder->where('tenant_a_id', 1);
+            });
 
-        $this->assertEquals(['tenant_a_id' => 1, 'tenant_b_id' => 2], $landlord->getTenants()->toArray());
+        $tenantB = (new TenantScope())
+            ->onQuery(function (Builder $builder, Model $model) {
+                $builder->where('tenant_b_id', 2);
+            });
 
-        $landlord->removeTenant($tenantA);
+        Landlord::addTenant('tenant_a_id', $tenantA);
+        Landlord::addTenant('tenant_b_id', $tenantB);
 
-        $this->assertEquals(['tenant_b_id' => 2], $landlord->getTenants()->toArray());
+        $model = new ModelStub();
+        $sql = $this->getSqlFromBuilder($model->query());
 
-        $this->assertTrue($landlord->hasTenant('tenant_b_id'));
-
-        $this->assertFalse($landlord->hasTenant('tenant_a_id'));
+        $this->assertContains("\"tenant_a_id\" = '1'", $sql);
+        $this->assertContains("\"tenant_b_id\" = '2'", $sql);
     }
 
     public function testApplyTenantScopes()
     {
-        $landlord = new TenantManager();
-
-        $landlord->addTenant('tenant_a_id', 1);
-
-        $landlord->addTenant('tenant_b_id', 2);
-
-        Landlord::shouldReceive('applyTenantScopes');
+        Landlord::addTenant('tenant_a_id', 1);
+        Landlord::addTenant('tenant_c_id', 1);
 
         $model = new ModelStub();
 
-        $landlord->applyTenantScopes($model);
+        Landlord::applyTenantScopes($model);
 
         $this->assertArrayHasKey('tenant_a_id', $model->getGlobalScopes());
-
         $this->assertArrayNotHasKey('tenant_b_id', $model->getGlobalScopes());
+        $this->assertArrayNotHasKey('tenant_c_id', $model->getGlobalScopes());
     }
 
     public function testApplyTenantScopesToDeferredModels()
     {
-        $landlord = new TenantManager();
-
         $model = new ModelStub();
-        $landlord->newModel($model);
 
-        $landlord->addTenant('tenant_a_id', 1);
-        $this->assertNull($model->tenant_a_id);
+        Landlord::newModel($model);
+        Landlord::addTenant('tenant_a_id', 1);
 
-        $landlord->applyTenantScopesToDeferredModels();
+        $sql = $this->getSqlFromBuilder($model->query());
+        $this->assertNotContains("\"model_stubs\".\"tenant_a_id\" = '1'", $sql);
 
-        $this->assertEquals(1, $model->tenant_a_id);
+        Landlord::applyTenantScopesToDeferredModels();
+
+        $sql = $this->getSqlFromBuilder($model->query());
+        //$this->assertContains("\"model_stubs\".\"tenant_a_id\" = '1'", $sql);
     }
 
     public function testNewModel()
     {
-        $landlord = new TenantManager();
+        Landlord::addTenant('tenant_a_id', 1);
+        Landlord::addTenant('tenant_b_id', 2);
+        Landlord::addTenant('tenant_c_id', 3);
 
-        $landlord->addTenant('tenant_a_id', 1);
-
-        $landlord->addTenant('tenant_b_id', 2);
-
-        Landlord::shouldReceive('applyTenantScopes');
-
-        $model = new ModelStub();
-
-        $landlord->newModel($model);
+        $model = ModelStub::create([
+            'name' => 'foo'
+        ]);
 
         $this->assertEquals(1, $model->tenant_a_id);
-
-        $this->assertNull($model->tenant_b_id);
+        $this->assertEquals(2, $model->tenant_b_id);
+        $this->assertNull($model->tenant_c_id);
     }
 
-    public function testGetTenantId()
+    protected function getSqlFromBuilder(\Illuminate\Database\Eloquent\Builder $builder)
     {
-        $landlord = new TenantManager();
+        $sql = $builder->toSql();
+        $bindings = $builder->getBindings();
 
-        $landlord->addTenant('tenant_a_id', 1);
-
-        $tenantId = $landlord->getTenantId('tenant_a_id');
-
-        $this->assertEquals(1, $tenantId);
+        $wrappedSql = str_replace('?', "'?'", $sql);
+        return str_replace_array('?', $bindings, $wrappedSql);
     }
 }
 
@@ -129,7 +145,8 @@ class ModelStub extends Model
 {
     use BelongsToTenants;
 
-    public $tenantColumns = ['tenant_a_id'];
+    public $fillable = ['name'];
+    public $tenantColumns = ['tenant_a_id', 'tenant_b_id'];
 }
 
 class TenantA extends Model
