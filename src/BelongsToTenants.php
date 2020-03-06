@@ -1,8 +1,8 @@
 <?php
 
-namespace HipsterJazzbo\Landlord;
+namespace Eloverde\Landlord;
 
-use HipsterJazzbo\Landlord\Exceptions\ModelNotFoundForTenantException;
+use Eloverde\Landlord\Exceptions\ModelNotFoundForTenantException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 

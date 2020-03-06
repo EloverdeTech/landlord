@@ -1,5 +1,5 @@
 {
-    "name": "hipsterjazzbo/landlord",
+    "name": "eloverde-sistemas/landlord",
     "description": "A simple, single database multi-tenancy solution for Laravel 5.2+",
     "license": "MIT",
     "keywords": [
@@ -12,6 +12,10 @@
         {
             "name": "Caleb Fidecaro",
             "email": "calebfidecaro@gmail.com"
+        },
+        {
+            "name": "Eloverde Sistemas",
+            "email": "contato@eloverde.com.br"
         }
     ],
     "require": {
@@ -25,16 +29,16 @@
     },
     "autoload": {
         "psr-4": {
-            "HipsterJazzbo\\Landlord\\": "src/"
+            "Eloverde\\Landlord\\": "src/"
         }
     },
     "extra": {
         "laravel": {
             "providers": [
-                "HipsterJazzbo\\Landlord\\LandlordServiceProvider"
+                "Eloverde\\Landlord\\LandlordServiceProvider"
             ],
             "aliases": {
-                "Landlord": "HipsterJazzbo\\Landlord\\Facades\\Landlord"
+                "Landlord": "Eloverde\\Landlord\\Facades\\Landlord"
             }
         }
     }
