@@ -60,28 +60,45 @@ class TenantManager
     /**
      * Add a tenant to scope by.
      *
+     * @param $tenantKey
      * @param string|Model $tenant
-     * @param mixed|null   $id
-     *
+     * @throws TenantColumnUnknownException
      * @throws TenantNullIdException
      */
-    public function addTenant($tenant, $id = null)
+    public function addTenant($tenant, $tenantValue = null)
     {
         if (func_num_args() == 1 && $tenant instanceof Model) {
-            $id = $tenant->getKey();
+            $tenantValue = $tenant->getKey();
         }
 
-        if (is_null($id)) {
-            throw new TenantNullIdException('$id must not be null');
+        if (is_null($tenantValue)) {
+            throw new TenantNullIdException('$tenantValue must not be null');
         }
 
-        $this->tenants->put($this->getTenantKey($tenant), $id);
+        $tenantKey = $this->getTenantKey($tenant);
+
+        if ($tenantValue instanceof TenantScope) {
+            $tenantScope = $tenantValue;
+        } else {
+            $tenantScope = (new TenantScope())
+                ->onQuery(function (Builder $builder, Model $model) use ($tenantKey, $tenantValue) {
+                    $builder->where($model->getQualifiedTenant($tenantKey), '=', $tenantValue);
+                })
+                ->onSave(function (Model $model) use ($tenantKey, $tenantValue) {
+                    if (!isset($model->{$tenantKey})) {
+                        $model->setAttribute($tenantKey, $tenantValue);
+                    }
+                });
+        }
+
+        $this->tenants->put($tenantKey, $tenantScope);
     }
 
     /**
      * Remove a tenant so that queries are no longer scoped by it.
      *
      * @param string|Model $tenant
+     * @throws TenantColumnUnknownException
      */
     public function removeTenant($tenant)
     {
@@ -111,9 +128,9 @@ class TenantManager
     /**
      * @param $tenant
      *
+     * @return mixed
      * @throws TenantColumnUnknownException
      *
-     * @return mixed
      */
     public function getTenantId($tenant)
     {
@@ -145,13 +162,7 @@ class TenantManager
         }
 
         $this->modelTenants($model)->each(function ($id, $tenant) use ($model) {
-            $model->addGlobalScope($tenant, function (Builder $builder) use ($tenant, $id, $model) {
-                if ($this->getTenants()->first() && $this->getTenants()->first() != $id) {
-                    $id = $this->getTenants()->first();
-                }
-
-                $builder->where($model->getQualifiedTenant($tenant), '=', $id);
-            });
+            $this->addScopeToQuery($model, $tenant, $id);
         });
     }
 
@@ -163,21 +174,23 @@ class TenantManager
         $this->deferredModels->each(function ($model) {
             /* @var Model|BelongsToTenants $model */
             $this->modelTenants($model)->each(function ($id, $tenant) use ($model) {
-                if (!isset($model->{$tenant})) {
-                    $model->setAttribute($tenant, $id);
-                }
+//                if (!isset($model->{$tenant})) {
+//                    $model->setAttribute($tenant, $id);
+//                }
 
-                $model->addGlobalScope($tenant, function (Builder $builder) use ($tenant, $id, $model) {
-                    if ($this->getTenants()->first() && $this->getTenants()->first() != $id) {
-                        $id = $this->getTenants()->first();
-                    }
-
-                    $builder->where($model->getQualifiedTenant($tenant), '=', $id);
-                });
+                $this->addScopeToQuery($model, $tenant, $id);
             });
         });
 
         $this->deferredModels = collect();
+    }
+
+    private function addScopeToQuery(Model $model, string $tenantKey, TenantScope $tenantScope)
+    {
+        $model->addGlobalScope($tenantKey, function (Builder $builder) use ($tenantKey, $tenantScope, $model) {
+            $callable = $tenantScope->getOnQuery();
+            $callable($builder, $model);
+        });
     }
 
     /**
@@ -198,10 +211,9 @@ class TenantManager
             return;
         }
 
-        $this->modelTenants($model)->each(function ($tenantId, $tenantColumn) use ($model) {
-            if (!isset($model->{$tenantColumn})) {
-                $model->setAttribute($tenantColumn, $tenantId);
-            }
+        $this->modelTenants($model)->each(function (TenantScope $tenantScope, string $tenantColumn) use ($model) {
+            $callable = $tenantScope->getOnCreate();
+            $callable($model);
         });
     }
 
@@ -220,25 +232,25 @@ class TenantManager
     /**
      * Get the key for a tenant, either from a Model instance or a string.
      *
-     * @param string|Model $tenant
-     *
-     * @throws TenantColumnUnknownException
+     * @param string|Model $tenantKey
      *
      * @return string
+     * @throws TenantColumnUnknownException
+     *
      */
-    protected function getTenantKey($tenant)
+    protected function getTenantKey($tenantKey)
     {
-        if ($tenant instanceof Model) {
-            $tenant = $tenant->getForeignKey();
+        if ($tenantKey instanceof Model) {
+            $tenantKey = $tenantKey->getForeignKey();
         }
 
-        if (!is_string($tenant)) {
+        if (!is_string($tenantKey)) {
             throw new TenantColumnUnknownException(
-                '$tenant must be a string key or an instance of \Illuminate\Database\Eloquent\Model'
+                '$tenantKey must be a string key or an instance of \Illuminate\Database\Eloquent\Model'
             );
         }
 
-        return $tenant;
+        return $tenantKey;
     }
 
     /**
